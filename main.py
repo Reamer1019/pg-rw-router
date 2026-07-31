@@ -12,10 +12,11 @@ Try it while doing a switchover on the lab cluster (efm promote -switchover)
 and watch /health flip which node is "primary" within one health-check
 interval, with zero code changes needed on the client side.
 """
+import os
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from pydantic import BaseModel
 
 from db_router import ClusterRouter, NoPrimaryAvailable, NoReplicaAvailable
@@ -33,6 +34,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="pg-rw-router demo", lifespan=lifespan)
 
+API_KEY = os.environ.get("API_KEY", "DEFAULT_API_KEY")
+
+def verify_api_key(x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    return None
 
 async def _ensure_schema():
     """Create the demo table on the primary if it doesn't exist yet."""
@@ -77,7 +84,7 @@ async def list_notes():
 
 
 @app.post("/notes", status_code=201)
-async def create_note(note: NoteIn):
+async def create_note(note: NoteIn, _: None = Depends(verify_api_key)):
     """Write path — always routed to the current primary."""
     try:
         node = router.get_write_node()
