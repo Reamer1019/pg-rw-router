@@ -9,7 +9,7 @@ tests never call .acquire()).
 """
 
 import pytest
-from db_router import ClusterRouter, NodeState, NoPrimaryAvailable, NoReplicaAvailable
+from db_router import ClusterRouter, NodeState, NoPrimaryAvailable, NoReplicaAvailable, AmbiguousPrimaryError
 
 
 def make_router(*, node_a_role, node_b_role):
@@ -79,3 +79,11 @@ def test_read_raises_when_nothing_reachable():
 
     with pytest.raises(NoReplicaAvailable):
         router.get_read_node()
+
+def test_write_raises_on_split_brain():
+    """If two nodes both claim to be primary at once (split-brain), refuse
+    to guess - raise instead of silently picking one and risking a write
+    to the wrong node."""
+    router = make_router(node_a_role="primary", node_b_role="primary")
+    with pytest.raises(AmbiguousPrimaryError):
+        router.get_write_node()

@@ -46,6 +46,9 @@ class NoPrimaryAvailable(Exception):
 class NoReplicaAvailable(Exception):
     pass
 
+class AmbiguousPrimaryError(Exception):
+    pass
+
 
 class ClusterRouter:
     def __init__(self, nodes=None):
@@ -137,6 +140,8 @@ class ClusterRouter:
         candidates = [n for n in self.nodes if n.reachable and n.is_primary]
         if not candidates:
             raise NoPrimaryAvailable("No reachable primary node right now.")
+        elif len(candidates) > 1:
+            raise AmbiguousPrimaryError("Should not appear more than one primary.")
         node = candidates[0]
         logger.info("WRITE routed to %s (%s)", node.name, node.host)
         return node
